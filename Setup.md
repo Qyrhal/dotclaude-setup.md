@@ -19,7 +19,9 @@ CLAUDE.md               ← project root
   settings.local.json   ← gitignored, created if user requests local overrides
   CLAUDE.local.md       ← gitignored, personal notes
   commands/             ← slash-command stubs
-  rules/                ← persistent rule files
+  rules/
+    maintain.md         ← self-maintenance contract, loaded every session
+    coding.md           ← behavioural guardrails for all coding tasks
   memory/               ← structured memory files
   kanban.md             ← live issue/fix tracker (session-persistent)
   improvements.md       ← forward-looking feature/quality backlog
@@ -111,6 +113,8 @@ run:    <command>
 ## Memory index
 @.claude/memory/architecture.md
 @.claude/memory/decisions.md
+@.claude/rules/maintain.md
+@.claude/rules/coding.md
 ```
 
 ---
@@ -277,22 +281,155 @@ run:    <command>
 
 ---
 
-## Phase 4 — Per-Session Routine
+### .claude/rules/maintain.md
 
-At the **start of every session**, before any task:
+This file is loaded every session via the `rules/` directory. It is the self-maintenance contract — the agent reads and obeys it continuously, not just at setup time.
 
-1. Read `.claude/kanban.md`.
-2. If open items exist, surface them:
+```markdown
+<!--
+  FILE: .claude/rules/maintain.md
+  PURPOSE: Instructs the agent to actively maintain the .claude directory
+           throughout every session. Loaded automatically by Claude Code
+           from the rules/ directory on each session start.
+  DO NOT DELETE — removing this file breaks session continuity.
+-->
+
+# .claude Maintenance Rules
+
+## Session start (always, before any task)
+
+1. Read kanban.md. If OPEN or IN-PROGRESS items exist, present them:
    ```
-   Open issues from kanban:
-   - [ID] [Severity] <description>
+   Open issues:
+   - [ID] [SEVERITY] <description>
    Fix now / defer / dismiss?
    ```
-3. On user confirmation, fix items in order of severity (CRITICAL → HIGH → MED → LOW).
-4. Append a Fix record to kanban.md for each resolved item.
-5. Update status column.
+2. Fix confirmed items highest-severity first. Append a Fix record. Update status.
+3. If no kanban items, check improvements.md and ask if user wants to action any P1 items.
 
-Do not surface improvements.md unless the user asks or there are no kanban items.
+## During work (continuous)
+
+### kanban.md
+- **Add** a new OPEN item when you discover a bug, security gap, or quality issue
+  not already listed. Do not wait for session end.
+- **Update** status to IN-PROGRESS when you start a fix.
+- **Update** status to FIXED and append a Fix record when done.
+- **Update** status to DEFERRED or DISMISSED if the user says so.
+- Never delete rows — only change status.
+
+### improvements.md
+- **Add** a row when you identify a meaningful improvement (perf, security,
+  maintainability, feature) that is out of scope for the current task.
+- **Remove** a row only when the improvement has been fully implemented and verified.
+
+### memory/architecture.md
+- **Update** when files, services, or data flows are added, removed, or renamed.
+
+### memory/decisions.md
+- **Append** a row when a non-obvious design decision is made during the session.
+
+### CLAUDE.md
+- **Update** commands, stack, or structure section if the project changes.
+- Keep ≤ 80 lines. Move overflow to memory/.
+
+### settings.json
+- **Add** to allow list if a new project command is introduced.
+- **Add** to deny list if a new shell-injection risk is found (log to kanban first).
+
+## Session end (always, after last task)
+
+1. Confirm all in-progress kanban items are either FIXED or explicitly DEFERRED.
+2. Confirm any decisions made this session are logged in decisions.md.
+3. Confirm architecture.md reflects current state.
+4. Do not summarise aloud unless the user asks — just write the files.
+
+## Hard rules
+
+- Never auto-fix [RISK: HIGH] kanban items without user confirmation.
+- kanban Fix records are append-only. Never edit or delete a past record.
+- audit.log is append-only. Never truncate.
+- CLAUDE.md must remain loadable in < 5 seconds (≤ 80 lines, no binary content).
+```
+
+---
+
+### .claude/rules/coding.md
+
+Loaded every session alongside `maintain.md`. Contains behavioural guardrails that reduce common LLM coding mistakes.
+
+```markdown
+<!--
+  FILE: .claude/rules/coding.md
+  PURPOSE: Behavioural guardrails applied to every coding task in this project.
+           Biases toward caution over speed — use judgment on trivial tasks.
+           Loaded automatically from rules/ each session.
+  DO NOT DELETE — removing this degrades output quality and traceability.
+-->
+
+# Coding Behaviour
+
+## 1. Think Before Coding
+Before implementing anything:
+- State assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them — don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+## 2. Simplicity First
+Minimum code that solves the problem. Nothing speculative.
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Heuristic: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+Touch only what you must. Clean up only your own mess.
+
+When editing existing code:
+- Don't improve adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it — don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+Test: every changed line must trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+Transform tasks into verifiable goals before starting:
+- "Add validation" → "Write tests for invalid inputs, then make them pass."
+- "Fix the bug" → "Write a test that reproduces it, then make it pass."
+- "Refactor X" → "Ensure tests pass before and after."
+
+For multi-step tasks, state a plan first:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Weak success criteria ("make it work") require constant clarification.
+Strong criteria let you loop independently.
+
+## Health check
+These rules are working if:
+- Diffs contain fewer unnecessary changes.
+- Fewer rewrites due to overcomplication.
+- Clarifying questions come before implementation, not after mistakes.
+```
+
+---
+
+## Phase 4 — Per-Session Routine
+
+The agent follows `.claude/rules/maintain.md` automatically each session. No manual intervention needed. The rules file is the routine.
+
+The only manual step: user responds to the opening kanban prompt (fix / defer / dismiss). Everything else the agent handles.
 
 ---
 

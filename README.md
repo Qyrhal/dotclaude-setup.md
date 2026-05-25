@@ -1,4 +1,4 @@
-# A Setup.md file for Project level .claude folders
+# A Setup.md file for Project level .claude folders and Agents.md
 Universal template for "Copy Paste" to your project directory
 
 ## Quick start

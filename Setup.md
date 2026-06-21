@@ -1,40 +1,38 @@
 # setup.md
 
 <!--
-  PURPOSE: Agent-executable runbook for bootstrapping agent configuration files.
-  Supports Claude Code (.claude/), universal AGENTS.md, or both.
-  Scope: only the files listed below. Never touches source code or CI config.
+  PURPOSE: Agent-executable runbook — bootstraps agent configuration files only.
+  Scope: files listed below. Never touches source code, CI config, or lockfiles.
   Refs:
     https://code.claude.com/docs/en/claude-directory
     https://agents.md/
-    https://github.com/agentsmd/agents.md
 -->
 
 ---
 
 ## Scope
 
-Depending on mode selected in Phase 2, touches only:
+| File | When created |
+|---|---|
+| `AGENTS.md` | AGENTS-only or Both modes |
+| `CLAUDE.md` | Claude or Both modes |
+| `.claude/settings.json` | Claude or Both modes |
+| `.claude/settings.local.json` | Claude or Both modes, if user opts in |
+| `.claude/CLAUDE.local.md` | Claude or Both modes |
+| `.claude/commands/` | Claude or Both modes |
+| `.claude/rules/maintain.md` | Claude or Both modes |
+| `.claude/rules/coding.md` | Claude or Both modes |
+| `.claude/memory/architecture.md` | Claude or Both modes |
+| `.claude/memory/decisions.md` | Claude or Both modes |
+| `kanban.md` / `.claude/kanban.md` | Always (location depends on mode) |
+| `improvements.md` / `.claude/improvements.md` | Always (location depends on mode) |
 
+**gitignore entries to add (always):**
 ```
-AGENTS.md               ← universal format (agents.md spec), project root
-CLAUDE.md               ← Claude Code primary memory, project root
-.claude/
-  settings.json
-  settings.local.json   ← gitignored, personal overrides
-  CLAUDE.local.md       ← gitignored, personal notes
-  commands/             ← slash-command stubs
-  rules/
-    maintain.md         ← self-maintenance contract, every session
-    coding.md           ← behavioural guardrails, every session
-  memory/
-    architecture.md
-    decisions.md
-  kanban.md             ← live issue tracker
-  improvements.md       ← forward-looking backlog
+.claude/settings.local.json
+.claude/CLAUDE.local.md
+.claude/audit.log
 ```
-
-**Never touches source code, CI config, dependencies, or lockfiles.**
 
 ---
 
@@ -46,13 +44,9 @@ Read silently. Do not output findings yet.
 |---|---|
 | Language / runtime | `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `*.csproj` |
 | Test runner | test scripts, pytest config, Makefile targets |
-| Build commands | build scripts, Makefile, Dockerfile |
-| Lint / format | `.eslintrc`, `.prettierrc`, `ruff.toml`, `.golangci.yml` |
+| Build / lint commands | build scripts, Makefile, `.eslintrc`, `.prettierrc`, `ruff.toml` |
 | Secrets exposure | `.env` committed, hardcoded tokens, API keys in source |
-| Dependency hygiene | lockfile present, `node_modules` committed, CVE patterns |
-| Structure clarity | deep nesting, missing README, no obvious entrypoint |
-| Permissions / auth | middleware patterns, auth guards, RBAC hints |
-| Logging | structured vs. ad-hoc, sensitive data in logs |
+| Dependency hygiene | lockfile present, `node_modules` committed |
 | Error handling | bare `catch {}`, unhandled promise rejections, unrecovered panics |
 | Existing agent files | `AGENTS.md`, `CLAUDE.md`, `.claude/`, `.cursor/`, `.aider.conf.yml` |
 
@@ -60,49 +54,47 @@ Read silently. Do not output findings yet.
 
 ## Phase 2 — Questions
 
-Batch all questions into one prompt. Skip any answered by the scan.
+Ask all of the following in a single prompt. Omit any question the scan already answered with certainty.
 
 ```
 I've scanned the repo. A few things I need to confirm:
 
 0. Which agent configuration do you want?
-   a) AGENTS.md only       — works across all agents (OpenAI Codex, Cursor,
-                              Windsurf, Gemini CLI, Aider, GitHub Copilot, etc.)
-   b) .claude/ only        — Claude Code-specific, full feature set
-   c) Both                 — AGENTS.md as universal base + .claude/ as
-                              Claude-specific enhancement layer [recommended]
+   a) AGENTS.md only  — universal, works across all agents
+   b) .claude/ only   — Claude Code-specific, full feature set
+   c) Both            — AGENTS.md as shared base + .claude/ as Claude layer [recommended]
 
-1. [If runtime ambiguous] What language/runtime is primary?
-2. [If no test runner found] What command runs tests?
-3. [If no build script found] What is the build command?
-4. What is the primary purpose of this project? (one sentence)
-5. Any security or compliance requirements? (HIPAA, PCI-DSS, GDPR, SOC 2, etc.)
-6. Any team conventions not obvious from code? (style, PR rules, etc.)
-7. [If mode includes .claude/] Create settings.local.json for personal overrides? (yes/no)
-8. [If existing agent files found] Existing files detected: <list>. Merge or replace?
+1. What is the primary purpose of this project? (one sentence)
+2. What command runs tests?
+3. What is the build command?
+4. Any security or compliance requirements? (HIPAA, PCI-DSS, GDPR, SOC 2, etc.)
+5. Any team conventions not obvious from code? (style, PR rules, commit format, etc.)
+6. Should I create settings.local.json for personal local overrides? (yes/no)
+7. [If existing agent files found] Existing files detected: <list>. Merge or replace?
 ```
 
-Proceed based on answer to Q0. Sections below are labelled by mode.
+**After Q0:**
+- Mode **a** → generate AGENTS.md + kanban.md + improvements.md at project root only.
+- Mode **b** → generate all `.claude/` files + CLAUDE.md. Skip AGENTS.md.
+- Mode **c** → generate everything. CLAUDE.md defers to AGENTS.md; no duplication.
 
 ---
 
 ## Phase 3 — Generate Files
 
-### [ALL MODES] AGENTS.md (project root)
+### AGENTS.md  _(modes: a, c)_
 
-Universal format. Readable by any agent that supports the agents.md spec.
-If mode is `.claude/ only`, skip this file.
-If an AGENTS.md already exists and user chose merge, extend it rather than overwrite.
+Place at project root. Keep agent-agnostic — no Claude-specific syntax.
+If merging with an existing file, extend rather than overwrite.
 
-```markdown
+~~~markdown
 <!--
   FILE: AGENTS.md
-  PURPOSE: Universal agent instructions for this project.
-           Works across Claude Code, OpenAI Codex, Cursor, Windsurf,
-           Gemini CLI, Aider, GitHub Copilot, Amp, and others.
-           Ref: https://agents.md/
-  MAINTENANCE: Update commands, structure, and conventions when the project changes.
-               For nested packages, place a child AGENTS.md inside each subdirectory.
+  PURPOSE: Universal agent instructions. Works across Claude Code, OpenAI Codex,
+           Cursor, Windsurf, Gemini CLI, Aider, GitHub Copilot, Amp, and others.
+  MAINTENANCE: Update commands and conventions when the project changes.
+               For monorepos, place a child AGENTS.md in each package directory.
+  Ref: https://agents.md/
 -->
 
 # <project-name>
@@ -111,23 +103,21 @@ If an AGENTS.md already exists and user chose merge, extend it rather than overw
 <one-sentence description>
 
 ## Stack
-<language, framework, runtime — inferred from scan>
+<language, framework, runtime>
 
 ## Commands
-```bash
-build: <command>
-test:  <command>
-lint:  <command>
-run:   <command>
-```
+    build: <command>
+    test:  <command>
+    lint:  <command>
+    run:   <command>
 
 ## Structure
 <3–6 line directory map — key folders only>
 
 ## Code style
-- <style rule 1 — inferred or from Q6>
+- <inferred style rule or from Q5>
 - <naming convention>
-- <any compliance requirement from Q5>
+- <compliance requirement from Q4, if any>
 
 ## Testing
 - Run the full test suite before any commit.
@@ -135,54 +125,49 @@ run:   <command>
 - A task is not done until tests pass.
 
 ## Security
-- <inferred from scan or Q5 — e.g. "never log auth tokens", "validate all inputs">
+- <inferred from scan or Q4 — e.g. "never log auth tokens", "validate all inputs">
 
 ## Conventions
-- <PR or commit message format from Q6, if any>
+- <commit / PR format from Q5, if any>
 - Clarify ambiguities before implementing.
 - Prefer the simplest solution that works.
 - Touch only what the task requires.
-```
+
+## Agent session routine
+At session start (AGENTS.md-only mode), before any task:
+1. Read kanban.md. Present any OPEN or IN-PROGRESS items: fix / defer / dismiss?
+2. Fix confirmed items highest-severity first. Append Fix record. Update status.
+3. If no kanban items, check improvements.md — ask if user wants to action P1 items.
+~~~
 
 ---
 
-### [ALL MODES] Kanban and improvements
+### kanban.md  _(all modes)_
 
-These live in `.claude/` when `.claude/` is enabled.
-When `AGENTS.md only` mode is selected, place them at project root instead:
+Location: `.claude/kanban.md` in Claude/Both modes; project root in AGENTS-only mode.
 
-```
-kanban.md
-improvements.md
-```
-
-The files are identical in either case — only their location differs.
-
-#### kanban.md
-
-```markdown
+~~~markdown
 <!--
-  FILE: kanban.md  (or .claude/kanban.md)
-  PURPOSE: Session-persistent issue tracker. At session start, agent reads
-           this file, surfaces open items, and asks: fix / defer / dismiss?
+  FILE: kanban.md
+  PURPOSE: Session-persistent issue tracker. Agent reads this at session start,
+           surfaces open items, and asks: fix / defer / dismiss?
            Agent updates status after each action.
-  Quality bar: DO-178B-aligned — every fix traceable to symptom, root cause,
-               and verification step.
-  DO NOT auto-fix [RISK: HIGH] items without explicit user confirmation.
+  RULE: DO NOT auto-fix [SEVERITY: HIGH] items without explicit user confirmation.
+        Fix records are append-only — never edit or delete past records.
 -->
 
 ## Backlog
 
 | ID | Category | Severity | Item | Status |
 |---|---|---|---|---|
-<!-- Agent populates from Phase 1 scan findings -->
+<!-- Populate from Phase 1 scan findings -->
 <!-- Severity: LOW / MED / HIGH / CRITICAL -->
 <!-- Status: OPEN / IN-PROGRESS / FIXED / DEFERRED / DISMISSED -->
 
 ## Fix record
 
 <!--
-  Append for every resolved item — never edit or delete past records.
+  Append for every resolved item. Never edit or delete past records.
 
   ### FIX-<ID>
   **File:** <path>
@@ -192,13 +177,17 @@ The files are identical in either case — only their location differs.
   **Verification:** <test command or manual step>
   **Date:** <ISO 8601>
 -->
-```
+~~~
 
-#### improvements.md
+---
 
-```markdown
+### improvements.md  _(all modes)_
+
+Location: `.claude/improvements.md` in Claude/Both modes; project root in AGENTS-only mode.
+
+~~~markdown
 <!--
-  FILE: improvements.md  (or .claude/improvements.md)
+  FILE: improvements.md
   PURPOSE: Forward-looking backlog — maintainability, performance, security,
            and new features. Reviewed periodically, not every session.
 -->
@@ -210,21 +199,21 @@ The files are identical in either case — only their location differs.
 <!-- Category: maintainability | performance | security | feature -->
 <!-- Priority: P1=do soon  P2=next quarter  P3=someday -->
 <!-- Effort: S / M / L -->
-```
+~~~
 
 ---
 
-### [.claude/ MODE] CLAUDE.md (project root)
+### CLAUDE.md  _(modes: b, c)_
 
-Claude Code's primary memory file. Kept ≤ 80 lines; overflow goes to `.claude/memory/`.
-If AGENTS.md was also generated, CLAUDE.md can be shorter — reference AGENTS.md rather than duplicating.
+Place at project root. Keep ≤ 80 lines; overflow to `.claude/memory/`.
 
-```markdown
+In **Both** mode — reference AGENTS.md instead of duplicating content:
+
+~~~markdown
 <!--
   FILE: CLAUDE.md
   PURPOSE: Claude Code primary memory. Loaded at every session start.
-           Delegates to AGENTS.md for shared context; .claude/ for deep memory.
-  Target: ≤ 80 lines.
+  RULE: Keep ≤ 80 lines. Overflow to .claude/memory/.
 -->
 
 # <project-name>
@@ -232,7 +221,7 @@ If AGENTS.md was also generated, CLAUDE.md can be shorter — reference AGENTS.m
 > See AGENTS.md for full project context, commands, and conventions.
 
 ## Claude-specific notes
-<anything in AGENTS.md that needs Claude-specific framing or override>
+<anything that needs Claude-specific framing or overrides AGENTS.md for Claude sessions>
 
 ## Memory index
 @AGENTS.md
@@ -240,16 +229,19 @@ If AGENTS.md was also generated, CLAUDE.md can be shorter — reference AGENTS.m
 @.claude/memory/decisions.md
 @.claude/rules/maintain.md
 @.claude/rules/coding.md
-```
+~~~
 
-If no AGENTS.md was generated, CLAUDE.md must be self-contained (include project,
-commands, structure, standards sections — same content as AGENTS.md template above).
+In **Claude-only** mode — CLAUDE.md must be self-contained. Use the same sections
+as the AGENTS.md template above (Overview, Stack, Commands, Structure, Code style,
+Testing, Security, Conventions), then append the Memory index block.
 
 ---
 
-### [.claude/ MODE] .claude/settings.json
+### .claude/settings.json  _(modes: b, c)_
 
-```json
+Populate `allow` with only commands confirmed by the scan.
+
+~~~json
 {
   "permissions": {
     "allow": [
@@ -264,117 +256,98 @@ commands, structure, standards sections — same content as AGENTS.md template a
       "Bash(wget * | sh)"
     ]
   },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo \"[AUDIT] $(date -u +%Y-%m-%dT%H:%M:%SZ) BASH: $CLAUDE_TOOL_INPUT\" >> .claude/audit.log"
-          }
-        ]
-      }
-    ]
-  },
   "env": {
     "NODE_ENV": "development"
   }
 }
-```
+~~~
 
-Populate allow list with only commands actually found in the scan.
-Audit log satisfies DO-178B traceability.
+> **Note:** Claude Code hooks do not inject tool input as environment variables,
+> so shell-based audit logging of tool arguments is not reliably available.
+> Omit the `hooks` block; rely on Claude Code's native session transcript instead.
 
 ---
 
-### [.claude/ MODE] .claude/settings.local.json (gitignored, if Q7 = yes)
+### .claude/settings.local.json  _(modes: b, c — if Q6 = yes)_
 
-```json
+~~~json
 {
   "env": {
     "LOCAL_OVERRIDE": "true"
   }
 }
-```
+~~~
 
 ---
 
-### [.claude/ MODE] .claude/CLAUDE.local.md (gitignored)
+### .claude/CLAUDE.local.md  _(modes: b, c)_
 
-```markdown
+~~~markdown
 <!--
   FILE: CLAUDE.local.md
   PURPOSE: Personal session notes. Gitignored. Overrides CLAUDE.md locally.
 -->
 
 ## My overrides
-```
+~~~
 
 ---
 
-### [.claude/ MODE] .claude/memory/architecture.md
+### .claude/memory/architecture.md  _(modes: b, c)_
 
-```markdown
+~~~markdown
 <!--
   FILE: .claude/memory/architecture.md
-  PURPOSE: Structural map of the codebase. Updated on significant refactors.
+  PURPOSE: Structural map of the codebase. Update on significant refactors.
 -->
 
 ## Architecture
 <service boundaries, data flow, key modules — inferred from scan>
-```
+~~~
 
 ---
 
-### [.claude/ MODE] .claude/memory/decisions.md
+### .claude/memory/decisions.md  _(modes: b, c)_
 
-```markdown
+~~~markdown
 <!--
   FILE: .claude/memory/decisions.md
   PURPOSE: Log of non-obvious design decisions. Prevents re-litigating choices.
 -->
 
 ## Decision log
+
 | Decision | Reason | Date |
 |---|---|---|
-| | | |
-```
+~~~
 
 ---
 
-### [.claude/ MODE] .claude/rules/maintain.md
+### .claude/rules/maintain.md  _(modes: b, c)_
 
-Loaded every session. Self-maintenance contract for the entire `.claude/` directory
-and AGENTS.md (if present).
-
-```markdown
+~~~markdown
 <!--
   FILE: .claude/rules/maintain.md
-  PURPOSE: Instructs the agent to maintain all agent config files throughout
-           every session. Loaded automatically from rules/ on session start.
-  DO NOT DELETE — removing this breaks session continuity.
+  PURPOSE: Self-maintenance contract for all agent config files.
+           Loaded automatically each session. DO NOT DELETE.
 -->
 
 # Maintenance Rules
 
-## Session start (always, before any task)
+## Session start — before any task
 
-1. Read kanban.md. If OPEN or IN-PROGRESS items exist, present them:
-   ```
-   Open issues:
-   - [ID] [SEVERITY] <description>
-   Fix now / defer / dismiss?
-   ```
+1. Read `.claude/kanban.md`. If OPEN or IN-PROGRESS items exist, present them:
+       Open issues:
+       - [ID] [SEVERITY] <description>
+       Fix now / defer / dismiss?
 2. Fix confirmed items highest-severity first. Append Fix record. Update status.
-3. If no kanban items, check improvements.md — ask if user wants to action P1 items.
+3. If no kanban items, check `improvements.md` — ask if user wants to action P1 items.
 
-## During work (continuous)
+## During work
 
 **kanban.md**
 - Add OPEN item immediately when you find a bug, security gap, or quality issue.
-- Update to IN-PROGRESS when starting a fix.
-- Update to FIXED and append Fix record when done.
+- Update to IN-PROGRESS when starting a fix; FIXED when done with Fix record appended.
 - Update to DEFERRED or DISMISSED on user instruction.
 - Never delete rows — only change status.
 
@@ -383,11 +356,11 @@ and AGENTS.md (if present).
 - Remove a row only when fully implemented and verified.
 
 **AGENTS.md** (if present)
-- Update commands, stack, structure, or conventions when the project changes.
-- Keep it accurate — it is read by every agent, not just Claude.
+- Update commands, stack, structure, and conventions when the project changes.
+- Keep it agent-agnostic — no Claude-specific syntax.
 
 **memory/architecture.md**
-- Update when files, services, or data flows are added, removed, or renamed.
+- Update when files, services, or data flows change.
 
 **memory/decisions.md**
 - Append a row for every non-obvious design decision made this session.
@@ -396,59 +369,52 @@ and AGENTS.md (if present).
 - Update if project context changes. Keep ≤ 80 lines.
 
 **settings.json**
-- Add to allow list when a new project command is introduced.
-- Add to deny list when a shell-injection risk is found (log to kanban first).
+- Add to `allow` when a new project command is introduced.
+- Add to `deny` when a shell-injection risk is found (log to kanban first).
 
-## Session end (always, after last task)
+## Session end — after last task
 
-1. All in-progress kanban items must be FIXED or DEFERRED.
-2. Decisions made this session are logged in decisions.md.
-3. architecture.md reflects current state.
+1. All in-progress kanban items are FIXED or DEFERRED.
+2. Decisions made this session are logged in `decisions.md`.
+3. `architecture.md` reflects current state.
 4. AGENTS.md reflects any changed commands or conventions.
 5. Write files silently. Do not summarise unless asked.
 
 ## Hard rules
 
-- Never auto-fix [RISK: HIGH] kanban items without user confirmation.
+- Never auto-fix [SEVERITY: HIGH] kanban items without user confirmation.
 - kanban Fix records are append-only. Never edit or delete past records.
-- audit.log is append-only. Never truncate.
 - CLAUDE.md must stay ≤ 80 lines.
-- AGENTS.md is the source of truth for cross-agent conventions; CLAUDE.md defers to it.
-```
+- AGENTS.md is the cross-agent source of truth; CLAUDE.md defers to it per session.
+~~~
 
 ---
 
-### [.claude/ MODE] .claude/rules/coding.md
+### .claude/rules/coding.md  _(modes: b, c)_
 
-```markdown
+~~~markdown
 <!--
   FILE: .claude/rules/coding.md
-  PURPOSE: Behavioural guardrails for every coding task.
-           Biases toward caution over speed — use judgment on trivial tasks.
-           Loaded automatically from rules/ each session.
-  DO NOT DELETE — removing this degrades output quality and traceability.
+  PURPOSE: Behavioural guardrails for every coding task. DO NOT DELETE.
 -->
 
 # Coding Behaviour
 
-## 1. Think Before Coding
+## 1. Think before coding
 - State assumptions explicitly. If uncertain, ask.
 - If multiple interpretations exist, present them — don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
+- If a simpler approach exists, say so.
+- If something is unclear, name what's confusing and ask.
 
-## 2. Simplicity First
-Minimum code that solves the problem. Nothing speculative.
+## 2. Simplicity first
+Write the minimum code that solves the problem. Nothing speculative.
 - No features beyond what was asked.
 - No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
 - No error handling for impossible scenarios.
 - If you write 200 lines and it could be 50, rewrite it.
 
-Heuristic: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
-Touch only what you must. Clean up only your own mess.
+## 3. Surgical changes
+Touch only what you must.
 
 When editing existing code:
 - Don't improve adjacent code, comments, or formatting.
@@ -460,74 +426,42 @@ When your changes create orphans:
 - Remove imports/variables/functions that YOUR changes made unused.
 - Don't remove pre-existing dead code unless asked.
 
-Test: every changed line must trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-Transform tasks into verifiable goals before starting:
+## 4. Goal-driven execution
+Before starting any task, restate it as a verifiable goal:
 - "Add validation" → "Write tests for invalid inputs, then make them pass."
 - "Fix the bug" → "Write a test that reproduces it, then make it pass."
-- "Refactor X" → "Ensure tests pass before and after."
 
 For multi-step tasks, state a plan first:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-```
+    1. [Step] → verify: [check]
+    2. [Step] → verify: [check]
 
-Weak criteria ("make it work") require constant clarification.
-Strong criteria let you loop independently.
+## 5. Documentation standard
+Every function added or modified gets a docblock:
+    Purpose  — what it does, one sentence
+    Params   — name, type, constraints
+    Returns  — type and meaning
+    Raises   — error types and when
+    Issues   — open kanban IDs affecting this function
 
-## Health check
-These rules are working if:
-- Diffs contain fewer unnecessary changes.
-- Fewer rewrites from overcomplication.
-- Clarifying questions come before implementation, not after mistakes.
-```
-
----
-
-## Phase 4 — Per-Session Routine
-
-The agent follows `.claude/rules/maintain.md` automatically each session.
-For `AGENTS.md only` mode, embed the session-start routine directly in AGENTS.md
-under a `## Agent session routine` section using the same text.
-
-The only manual step: user responds to the opening kanban prompt.
-
----
-
-## Phase 5 — Documentation Standard
-
-Every function or method added or modified must include a docblock:
-
-```
-Purpose  — what it does, one sentence
-Params   — name, type, constraints
-Returns  — type and meaning
-Raises   — error types and when
-Issues   — open kanban IDs affecting this function
-Fixed    — closed kanban IDs (summary, date)
-```
-
-Every file the agent creates or substantively edits gets a header:
-
-```
-Purpose  — why this file exists
-Owner    — module or domain
-Deps     — direct dependencies
-Issues   — open kanban IDs
-```
+Every file created or substantively edited gets a header:
+    Purpose  — why this file exists
+    Owner    — module or domain
+    Deps     — direct dependencies
+    Issues   — open kanban IDs
 
 Factual only. No filler. One sentence per field unless unavoidable.
+~~~
 
 ---
 
 ## Constraints
 
-- Scope: only files listed in the Scope section above.
-- Never commit `settings.local.json` or `CLAUDE.local.md`.
-- Never auto-fix `[RISK: HIGH]` kanban items without confirmation.
-- CLAUDE.md ≤ 80 lines. Overflow to `.claude/memory/`.
-- `audit.log` is append-only. Never truncate or delete.
-- AGENTS.md is the cross-agent source of truth. Keep it agent-agnostic — no Claude-specific syntax inside it.
-- If AGENTS.md and CLAUDE.md conflict, CLAUDE.md governs for Claude sessions only.
+| Rule | Detail |
+|---|---|
+| Scope | Only files listed in the Scope table. Never source code, CI config, or lockfiles. |
+| Gitignore | Always add the three entries listed in the Scope section. |
+| CLAUDE.md length | ≤ 80 lines. Overflow to `.claude/memory/`. |
+| HIGH severity items | Never auto-fix without explicit user confirmation. |
+| Fix records | Append-only. Never edit or delete. |
+| AGENTS.md | Agent-agnostic. No Claude-specific syntax inside it. |
+| Conflict resolution | If AGENTS.md and CLAUDE.md conflict, CLAUDE.md governs for Claude sessions only. |
